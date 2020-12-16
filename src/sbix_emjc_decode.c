@@ -206,7 +206,7 @@ static size_t getFsize(FILE* f) {
 int main(int argc, char** argv) {
 	if (argc <= 1) {
 		printf("Usage: %s EMJC_FILE_TO_DECODE\n", argv[0]);
-		goto err;
+		goto done;
 	}
 
 	FILE* emjcf = fopen(argv[1], "rb");
