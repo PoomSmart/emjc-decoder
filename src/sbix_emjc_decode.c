@@ -4,12 +4,19 @@
 //
 //  Created by cc4966 on 2018/08/19.
 //
+//  YPwn was here. 2020
+//
 
 #include "sbix_emjc_decode.h"
 
+#include <sys/stat.h>
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <lzfse.h>
+
+extern int fileno(FILE* stream);
 
 EMJC_API uint16_t emjc_width(const uint8_t *__restrict src_buffer,
                              size_t src_size)
@@ -34,7 +41,8 @@ EMJC_API size_t emjc_decode_buffer_size(const uint8_t *__restrict src_buffer,
     const size_t width = (size_t) p[8] + ((size_t) p[9] << 8);
     const size_t height = (size_t) p[10] + ((size_t) p[11] << 8);
     const uint16_t appendix_length = (uint16_t) p[12] + ((uint16_t) p[13] << 8);
-    return (width * height * (4 + sizeof(int32_t)) + height + appendix_length);
+    //return (width * height * (4 + sizeof(int32_t)) + height + appendix_length);
+    return (height * width) + height + (height * width * 3) + appendix_length;
 }
 
 int32_t convert_to_difference(int32_t value, int32_t offset) {
@@ -57,7 +65,7 @@ int32_t filter4_value(int32_t left, int32_t upper) {
 EMJC_API int emjc_decode_buffer(uint8_t *__restrict dst_buffer,
                                 const uint8_t *__restrict src_buffer,
                                 size_t src_size,
-                                void *__restrict decode_buffer)
+                                size_t dst_size)
 {
     const uint8_t *p = src_buffer;
     const size_t data_length = src_size;
@@ -71,9 +79,11 @@ EMJC_API int emjc_decode_buffer(uint8_t *__restrict dst_buffer,
     const uint16_t appendix_length = (uint16_t) p[12] + ((uint16_t) p[13] << 8);
     // const uint16_t padding = (uint16_t) p[14] + ((uint16_t) p[15] << 8);
     const uint16_t filter_length = height;
-    const size_t dst_length = (size_t) height * width + filter_length + (size_t) height * width * 3 + appendix_length;
+    //const size_t dst_length = (size_t) height * width + filter_length + (size_t) height * width * 3 + appendix_length;
+    const size_t dst_length = dst_size;
     uint8_t *dst = (uint8_t *) malloc(dst_length + 1);
-    const size_t len = lzfse_decode_buffer(dst, dst_length + 1, p + 16, data_length - 8 - 16, NULL);
+    //const size_t len = lzfse_decode_buffer(dst, dst_length + 1, p + 16, data_length - 8 - 16, NULL);
+    const size_t len = lzfse_decode_buffer(dst, dst_length, p + 16, data_length - 16, NULL);
     if ( len != dst_length ) {
         free(dst);
         return -1;
@@ -176,13 +186,62 @@ EMJC_API int emjc_decode_buffer(uint8_t *__restrict dst_buffer,
                 g = base + (q + 1) / 2;
                 b = base - p / 2 - q / 2;
             }
-            dst_buffer[i * 4 + 0] = b < 0 ? (b % 257) + 257 : (b % 257);
+            dst_buffer[i * 4 + 0] = r < 0 ? (r % 257) + 257 : (r % 257);
             dst_buffer[i * 4 + 1] = g < 0 ? (g % 257) + 257 : (g % 257);
-            dst_buffer[i * 4 + 2] = r < 0 ? (r % 257) + 257 : (r % 257);
+            dst_buffer[i * 4 + 2] = b < 0 ? (b % 257) + 257 : (b % 257);
             dst_buffer[i * 4 + 3] = alpha[i];
         }
     }
     free(dst);
     free(buffer);
     return 0;
+}
+
+static size_t getFsize(FILE* f) {
+	struct stat st;
+	fstat(fileno(f), &st);
+	return st.st_size;
+}
+
+int main(int argc, char** argv) {
+	if (argc <= 1) {
+		printf("Usage: %s EMJC_FILE_TO_DECODE\n", argv[0]);
+		goto err;
+	}
+
+	FILE* emjcf = fopen(argv[1], "rb");
+	size_t src_size = getFsize(emjcf);
+	uint8_t* src_buffer = (uint8_t*)malloc(src_size);
+	fread(src_buffer, 1, src_size, emjcf);
+	fclose(emjcf);
+
+	if (*(uint32_t*)(src_buffer) != 0x316A6D65) {
+		puts("Error: Not an EMJC file.");
+		goto err;
+	}
+
+	uint16_t width = emjc_width(src_buffer, src_size);
+	uint16_t height = emjc_height(src_buffer, src_size);
+	printf("Dimensions: %dx%d\n", width, height);
+
+	size_t dst_size = emjc_decode_buffer_size(src_buffer, src_size);
+	uint8_t* dst_buffer = (uint8_t*)malloc(dst_size);
+	if (emjc_decode_buffer(dst_buffer, src_buffer, src_size, dst_size)) {
+		puts("Error: Convert operation failed.");
+		goto err;
+	}
+
+	free(src_buffer);
+	char* newname = (char*)malloc(strlen(argv[1]) + 10);
+	strcpy(newname, argv[1]);
+	strcat(newname, ".rgba");
+	FILE* rgbaf = fopen(newname, "wb");
+	fwrite(dst_buffer, 1, width*height*4, rgbaf);
+	fclose(rgbaf);
+
+done: ;
+	return 0;
+
+err: ;
+	return 1;
 }

@@ -4,6 +4,8 @@
 //
 //  Created by cc4966 on 2018/08/19.
 //
+//  YPwn was here. 2020
+//
 
 #ifndef sbix_emjc_decode_h
 #define sbix_emjc_decode_h
@@ -50,7 +52,7 @@ EMJC_API size_t emjc_decode_buffer_size(const uint8_t *__restrict src_buffer,
 EMJC_API int emjc_decode_buffer(uint8_t *__restrict dst_buffer,
                                 const uint8_t *__restrict src_buffer,
                                 size_t src_size,
-                                void *__restrict decode_buffer);
+                                size_t dst_size);
 
 #ifdef __cplusplus
 } /* extern "C" */
