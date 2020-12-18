@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
 
 	size_t dst_size = emjc_decode_buffer_size(src_buffer, src_size);
 	uint8_t* dst_buffer = (uint8_t*)malloc(dst_size);
-	if (emjc_decode_buffer(dst_buffer, src_buffer, src_size, dst_size)) {
+	if (emjc_decode_buffer(dst_buffer, src_buffer, src_size, dst_size) < 0) {
 		puts("Error: Convert operation failed.");
 		goto err;
 	}
